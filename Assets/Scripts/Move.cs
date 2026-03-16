@@ -8,6 +8,7 @@ public class Move : MonoBehaviour
     [SerializeField] private float moveSpeed = 405.5f;
 
     private bool jumpActive;
+    private bool dashActive;
     [SerializeField]  private int jumpHeight = 6;
     private RaycastHit hit;
 
@@ -29,8 +30,9 @@ public class Move : MonoBehaviour
         zAxis = Input.GetAxis("Vertical") * moveSpeed * Time.deltaTime;
 
         if (Input.GetKeyDown(KeyCode.Space) && onGround()) jumpActive = true;
+        if (Input.GetKeyDown(KeyCode.LeftShift)) dashActive = true;
 
-        if (Input.GetKey(KeyCode.LeftControl)) transform.localScale = new Vector3(transform.localScale.x, heightOfPlayer / 1.5f, transform.localScale.z);
+            if (Input.GetKey(KeyCode.LeftControl)) transform.localScale = new Vector3(transform.localScale.x, heightOfPlayer / 1.5f, transform.localScale.z);
         else transform.localScale = new Vector3(transform.localScale.x, heightOfPlayer, transform.localScale.z);
     }
 
@@ -44,10 +46,10 @@ public class Move : MonoBehaviour
             jumpActive = false;
         }
 
-        if (Input.GetKey(KeyCode.LeftShift))
+        if (dashActive)
         {
-            Vector3 dashVector = new Vector3(rb.linearVelocity.x, 0, rb.linearVelocity.z) * dashSpeed;
-            rb.AddForce(dashVector);
+            rb.AddForce(rb.linearVelocity.x * dashSpeed, 0 * dashSpeed, rb.linearVelocity.z * dashSpeed, ForceMode.Acceleration);
+            dashActive = false;
         }
     }
 
