@@ -1,69 +1,69 @@
-using Unity.VisualScripting;
-using UnityEditor.ShaderGraph.Internal;
 using UnityEngine;
 
 public class MovementScript : MonoBehaviour
 {
-    [SerializeField] public float speed = 5f;
-    [SerializeField] public float acceleration = 15f;
-    [Header("")]
-    [SerializeField] public float airControl = 0.5f;
-    [SerializeField] public float jumpHeight = 2f;
+    [SerializeField] public float speed = 15f;
+    [SerializeField] public float acceleration = 100f; // Increased for snappier start
+    [Header("Air Physics")]
+    [SerializeField] public float airControl = 0.2f; // How much friction applies in air
+    [SerializeField] public float jumpHeight = 4f;
     [SerializeField] private float coyoteTime = 0.15f;
-    [Header("")]
-    [SerializeField] public float gravity = -10f;
-    [SerializeField] public float friction = 10f;
-    [Header("")]
+    [Header("Environment")]
+    [SerializeField] public float gravity = -30f;
+    [SerializeField] public float groundFriction = 10f; // Tune this down (try 10-20)
     [SerializeField] public float slideFriction = 2f;
-    [SerializeField] public float slideSpeed = 20f;
 
     private CharacterController cc;
-    private Vector3 velocity;
+    private Vector3 verticalVelocity; // Renamed for clarity
     private Vector3 horizontalVelocity;
     private float coyoteCounter;
-    private bool isSliding = false;
 
-    void Awake()
-    {
-       cc=GetComponent<CharacterController>(); 
-    }
+    void Awake() => cc = GetComponent<CharacterController>();
 
     void Update()
     {
-        Vector3 inputDirection = (transform.right * Input.GetAxisRaw("Horizontal") + transform.forward * Input.GetAxisRaw("Vertical"));
+        // 1. GET INPUT
+        Vector3 inputDirection = (transform.right * Input.GetAxisRaw("Horizontal") + transform.forward * Input.GetAxisRaw("Vertical")).normalized;
 
-        float control = cc.isGrounded ? 1f : airControl;
+        // 2. APPLY FRICTION (The "Tax")
+        // Instead of stopping when keys are released, we always bleed speed.
+        float currentFriction = cc.isGrounded ? groundFriction : slideFriction;
 
-        horizontalVelocity += inputDirection * acceleration * control * Time.deltaTime;
+        // This math reduces velocity magnitude by a percentage over time
+        if (horizontalVelocity.magnitude > 0)
+        {
+            horizontalVelocity -= horizontalVelocity * currentFriction * Time.deltaTime;
+        }
 
+        // 3. APPLY ACCELERATION (The "Engine")
+        if (inputDirection.magnitude > 0.1f)
+        {
+            // MoveTowards allows us to reach 'speed' instantly without CAPING momentum.
+            // If horizontalVelocity is 50, MoveTowards(50, 15) won't do anything 
+            // unless you change direction.
+            horizontalVelocity = Vector3.MoveTowards(horizontalVelocity, inputDirection * speed, acceleration * Time.deltaTime);
+        }
+
+        // 4. VERTICAL LOGIC (Coyote Time & Gravity)
         if (cc.isGrounded)
         {
             coyoteCounter = coyoteTime;
+            if (verticalVelocity.y < 0) verticalVelocity.y = -2f;
         }
         else
         {
             coyoteCounter -= Time.deltaTime;
         }
-        if (horizontalVelocity.magnitude > speed)
-        {
-            horizontalVelocity = horizontalVelocity.normalized * speed;
-        }
-        if (cc.isGrounded && velocity.y < 0)
-        {
-            velocity.y = -2f;
-        }
+
         if (Input.GetButton("Jump") && coyoteCounter > 0)
         {
-            velocity.y = Mathf.Sqrt(jumpHeight * -2f * gravity);
+            verticalVelocity.y = Mathf.Sqrt(jumpHeight * -2f * gravity);
             coyoteCounter = 0f;
         }
-        if (cc.isGrounded && inputDirection.magnitude <0.1f)
-        {
-            float drag = Mathf.Max(horizontalVelocity.magnitude-friction*Time.deltaTime, 0f);   
-            horizontalVelocity = horizontalVelocity.normalized * drag;  
-        }
 
-        velocity.y += gravity * Time.deltaTime;
-        cc.Move((horizontalVelocity+velocity) *Time.deltaTime);
+        verticalVelocity.y += gravity * Time.deltaTime;
+
+        // 5. FINAL EXECUTION
+        cc.Move((horizontalVelocity + verticalVelocity) * Time.deltaTime);
     }
 }
